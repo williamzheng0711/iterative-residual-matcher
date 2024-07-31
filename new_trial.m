@@ -1,11 +1,11 @@
 % Generate the matrix
 m = 2^8;  % =256
-N = 10000; %
-P = 100;   % P stands for power
+N = 1024; % =8192
+P = 1;   % P stands for power
 H = sqrt(P) * 1/sqrt(m)*randn(m, N);
 
 % Generate the column vector of channels, each entry is exponential distribution with mean 5
-Ka = 20; 
+Ka = 100; 
 x_init = exprnd(15, [Ka, 1]);
 x_init = sort(x_init, "descend");  % better channels get decoded first
 
@@ -30,27 +30,22 @@ y_observe = y_true + z;
 x = x_init; 
 y = y_observe; 
 
-guesses = randperm(N, Ka);
-y_guess = H(:,guesses)*x; 
+cvx_begin
+    variable P(N, Ka)
 
-while true
-    guesses_old = guesses; 
-    for j = 1:Ka
-        f = @(v) norm(y_guess- x(j)* H(:,guesses(j)) + x(j)*v -y , 2);
-        results = arrayfun(@(t) f(H(:, t)), 1:size(H, 2));
-        if j > 1
-            results(guesses(1:(j-1))) = Inf;
-        end
-        [~, idx] = min(results);
-        guesses(j) = idx; 
-    end 
-    if prod(guesses_old == guesses) == 1
-        break
-    end
-end
+    P >= 0;
+    P <= 1;
+    ones(1,N)*P == ones(1, Ka); 
+    % P*ones(Ka,1) <= ones(N,1); 
 
+    % Objective function
+    minimize(norm(y-H*P*x, 2) + ones(1,N)*abs(P)*ones(Ka,1) );
+cvx_end
+
+row_sums = P*ones(Ka,1);
+[~, sortedIndex] = sort(row_sums, "descend");
+guesses = sortedIndex(1:Ka);
 
 % Display the indices
-fprintf('These are the estimated active messages')
-disp(guesses);
+disp(diag(P)); 
 disp(length(setdiff(guesses, chosenNums))); 

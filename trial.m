@@ -1,7 +1,7 @@
 % Generate the matrix
 m = 2^8;  % =256
-N = 10000; %
-P = 100;   % P stands for power
+N = 1000; %
+P = 1;   % P stands for power
 H = sqrt(P) * 1/sqrt(m)*randn(m, N);
 
 % Generate the column vector of channels, each entry is exponential distribution with mean 5
@@ -33,22 +33,28 @@ y = y_observe;
 guesses = randperm(N, Ka);
 y_guess = H(:,guesses)*x; 
 
-while true
-    guesses_old = guesses; 
-    for j = 1:Ka
-        f = @(v) norm(y_guess- x(j)* H(:,guesses(j)) + x(j)*v -y , 2);
-        results = arrayfun(@(t) f(H(:, t)), 1:size(H, 2));
-        if j > 1
-            results(guesses(1:(j-1))) = Inf;
-        end
-        [~, idx] = min(results);
-        guesses(j) = idx; 
-    end 
-    if prod(guesses_old == guesses) == 1
-        break
-    end
+U = zeros(N,Ka);
+for i = 1:Ka
+    U(guesses(i),i) = 1;
 end
 
+disp(norm(y - H*U*x,2)^2+ ones(1,N)*abs(U)*ones(Ka,1));
+
+t = 0; 
+U_t = U; 
+
+while true
+    lr = 1e-4 * 1/sqrt(t+1); 
+    Grad_t = 2*H'*(H* U_t *x-y)*x' + sign(U_t);
+    Xi_t = -lr * (Grad_t - 1/2* U_t *(Grad_t'*U_t + U_t'*Grad_t));
+    temp_1 = inv(eye(Ka)+Xi_t'*Xi_t);
+    temp_2 = sqrtm(temp_1); 
+    U_t = (U_t + Xi_t) * temp_2; 
+    if mod(t,3000) == 0
+        disp(norm(y - H*U_t*x,2)^2 + ones(1,N)*abs(U_t)*ones(Ka,1));
+    end
+    t = t+ 1;
+end
 
 % Display the indices
 fprintf('These are the estimated active messages')

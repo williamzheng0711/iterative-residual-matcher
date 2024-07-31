@@ -1,11 +1,11 @@
 % Generate the matrix
 m = 2^8;  % =256
-N = 2^13; % =8192
+N = 2^10; % =8192
 P = 10;   % P stands for power
 H = sqrt(P) * 1/sqrt(m)*randn(m, N);
 
 % Generate the column vector of channels, each entry is exponential distribution with mean 5
-Ka = 50; 
+Ka = 100; 
 x_init = exprnd(15, [Ka, 1]);
 x_init = sort(x_init, "descend");  % better channels get decoded first
 
@@ -22,8 +22,8 @@ for i = 1:Ka
 end
 
 % Additive noise (variance is 1, normalized)
-z = randn(m, 1);
-% z = zeros(m,1); 
+% z = randn(m, 1);
+z = zeros(m,1); 
 
 % Produce the "observable" y: 
 y_observe = y_true + z; 
