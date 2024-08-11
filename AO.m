@@ -57,10 +57,9 @@ while objval > 0.0001 || isnan(objval)
         P >= 0;
         ones(1,N)*P == ones(1,Ka); 
         P*ones(Ka,1) <= ones(N,1);
-        y-H*P*x == zeros(m,1); 
+        norm(y-H*P*x,2) + sum(sum(abs(P))) <= Ka; 
 
         % Objective function
-        % minimize( norm(y-H*P*x,2) + (u'*P*ones(Ka,1))^flag );  
         minimize( u'*P*ones(Ka,1) );  
     cvx_end
 

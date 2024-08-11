@@ -5,7 +5,7 @@ P = 1;   % P stands for power
 H = sqrt(P) * 1/sqrt(m)*randn(m, N);
 
 % Generate the column vector of channels, each entry is exponential distribution with mean 5
-Ka = 100; 
+Ka = 50; 
 x_init = exprnd(15, [Ka, 1]);
 x_init = sort(x_init, "descend");  % better channels get decoded first
 
@@ -35,11 +35,11 @@ cvx_begin
 
     P >= 0;
     P <= 1;
-    ones(1,N)*P == ones(1, Ka); 
-    % P*ones(Ka,1) <= ones(N,1); 
+    sum(P,1) == ones(1, Ka); 
+    % sum(P,2) <= ones(N,1); 
 
     % Objective function
-    minimize(norm(y-H*P*x, 2) + ones(1,N)*abs(P)*ones(Ka,1) );
+    minimize(norm(y-H*P*x, 2) + sum(sum(abs(P))) );
 cvx_end
 
 row_sums = P*ones(Ka,1);
