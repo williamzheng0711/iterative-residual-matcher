@@ -3,13 +3,14 @@ import numpy as np
 from copy import deepcopy
 
 # Define your matrix dimensions
-m, N = 173, 6000
+m, N = 40, 512
 K = 40
 
-H = np.random.normal(size=(m, N))
-beta = np.random.exponential(scale=15, size=K)
+H = np.random.normal(scale=1/np.sqrt(m), size=(m, N))
+beta = np.random.rayleigh(scale=5, size=K)
 # sort the vector from largest to smallest
 beta = np.sort(beta)[::-1]
+V = 1
 print("These are the channels: ", beta)
 
 # generating the received signal y
@@ -18,7 +19,7 @@ z = 0
 # chosenNums = np.random.choice(N, K, replace=False)
 # chosenNums = np.sort(chosenNums)
 chosenNums = range(0,K)
-y = H[:, chosenNums] @ beta + z
+y = np.sqrt(V) * H[:, chosenNums] @ beta + z
 print("These are the index of chosen cdwds: ", chosenNums)
 
 flag = True
@@ -30,7 +31,7 @@ beta_or = deepcopy(beta)
 while True:
     # Define your variable matrix P
     P = cp.Variable((N, K-num_decoded), nonneg= True)
-    objective = cp.Minimize( cp.norm(y - H @ P @ beta, 2) + np.ones((1,N)) @ P @ np.ones((K-num_decoded,1))  )
+    objective = cp.Minimize( cp.norm(y - np.sqrt(V) * H @ P @ beta, 2) + np.ones((1,N)) @ P @ np.ones((K-num_decoded,1))  )
     constraints = [ P >=0, 
                    cp.sum(P, axis=0) >= 1, 
                    cp.sum(P, axis=1) <= 1, 
