@@ -6,9 +6,10 @@ import copy
 m, N = 700, 200000
 K = 100
 
+np.random.seed(2222)
 H = np.random.normal(scale=1/np.sqrt(m), size=(m, N))
 V = 10
-beta = np.random.rayleigh(scale=5, size=K)
+beta = np.random.rayleigh(scale=10, size=K)
 # beta = 5 * np.ones(shape=(K))
 # sort the vector from largest to smallest
 beta = np.sort(beta)[::-1]
@@ -56,7 +57,6 @@ y_ml = y_ml_or
 decodedMsgs = []
 num_decoded_ml = 0
 
-print('\x1b[7h', end='')
 for j in range(K):
 
     ress = y_ml - beta[j]*np.sqrt(V)*H
@@ -72,7 +72,9 @@ for j in range(K):
 
     obj_curr = np.linalg.norm(y_ml,2)
     if j > 0: # We want to sort before further decode. 
-        for increment in np.sort(np.arange(start=1, step=1, stop=min(len(decodedMsgs)-1, 15),dtype=int))[::-1]:
+        arr = np.sort(np.arange(start=1, step=1, stop=min(len(decodedMsgs)-1, 20),dtype=int))[::-1]
+        # print(arr)
+        for increment in arr:
             num_iter = 0
             flag = False
             while True: 
@@ -90,7 +92,7 @@ for j in range(K):
                         obj_curr = proposed_obj
                         y_ml = proposed_residual
             
-                if flag == False or num_iter == 200:
+                if flag == False :
                     # print("Reordering phase %d finished, used %d many iterations" % (increment ,num_iter))
                     break
     print(decodedMsgs, end="\r", )
