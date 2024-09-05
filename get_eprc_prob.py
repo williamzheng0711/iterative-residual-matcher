@@ -130,11 +130,12 @@ def lauch_once_MLSIC(m,N,K,V, rayleigh_scale):
         y_ml = y_ml - np.array(H[:,suspect] * beta[j] * np.sqrt(V)).reshape(m,1)
         j = j + 1
 
-    # toAdd = [decodedMsg in chosenNums for decodedMsg in decodedMsgsML]
+    toAdd = [decodedMsg in chosenNums for decodedMsg in decodedMsgsML]
 
-    distances = np.array([ np.abs(decodedMsg - chosenNums[idx]) if decodedMsg in chosenNums else 10*K for idx, decodedMsg in enumerate(decodedMsgsML)], dtype=int)
+    # distances = np.array([ np.abs(decodedMsg - chosenNums[idx]) if decodedMsg in chosenNums else 10*K for idx, decodedMsg in enumerate(decodedMsgsML)], dtype=int)
 
-    return [ np.count_nonzero(distances == n) for n in range(K) ]
+    # return [ np.count_nonzero(distances == n) for n in range(K) ]
+    return toAdd
 
 
 # Define your matrix dimensions

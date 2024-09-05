@@ -6,10 +6,11 @@ import copy
 m, N = 700, 200000
 K = 100
 
-np.random.seed(2222)
+np.random.seed(1)
 H = np.random.normal(scale=1/np.sqrt(m), size=(m, N))
 V = 10
-beta = np.random.rayleigh(scale=10, size=K)
+beta = np.random.rayleigh(scale=5, size=K)
+# beta = [ 5 + (j % 30)*5 for j in range(K) ]
 # beta = 5 * np.ones(shape=(K))
 # sort the vector from largest to smallest
 beta = np.sort(beta)[::-1]
