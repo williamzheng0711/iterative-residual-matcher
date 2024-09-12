@@ -3,100 +3,15 @@ from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 import copy
 import matplotlib.pyplot as plt
-from joblib import Parallel, delayed
+from optparse import OptionParser
+# from joblib import Parallel, delayed
 # from parallel import ParallelTqdm
 
 
-class ParallelTqdm(Parallel):
-    """joblib.Parallel, but with a tqdm progressbar
-    Additional parameters:
-    ----------------------
-    total_tasks: int, default: None
-        the number of expected jobs. Used in the tqdm progressbar.
-        If None, try to infer from the length of the called iterator, and
-        fallback to use the number of remaining items as soon as we finish
-        dispatching.
-        Note: use a list instead of an iterator if you want the total_tasks
-        to be inferred from its length.
-    desc: str, default: None
-        the description used in the tqdm progressbar.
-    disable_progressbar: bool, default: False
-        If True, a tqdm progressbar is not used.
-    show_joblib_header: bool, default: False
-        If True, show joblib header before the progressbar.
-    Removed parameters:
-    -------------------
-    verbose: will be ignored
-    Usage:
-    ------
-    >>> from joblib import delayed
-    >>> from time import sleep
-    >>> ParallelTqdm(n_jobs=-1)([delayed(sleep)(.1) for _ in range(10)])
-    80%|████████  | 8/10 [00:02<00:00,  3.12tasks/s]
-    """
+def pdf_Rayleigh(scale, x):
+    return x*np.exp(-x**2 /(2*scale**2) ) / scale**2
 
-    def __init__(
-        self,
-        *,
-        total_tasks: int | None = None,
-        desc: str | None = None,
-        disable_progressbar: bool = False,
-        show_joblib_header: bool = False,
-        **kwargs
-    ):
-        if "verbose" in kwargs:
-            raise ValueError(
-                "verbose is not supported. "
-                "Use show_progressbar and show_joblib_header instead."
-            )
-        super().__init__(verbose=(1 if show_joblib_header else 0), **kwargs)
-        self.total_tasks = total_tasks
-        self.desc = desc
-        self.disable_progressbar = disable_progressbar
-        self.progress_bar: tqdm.tqdm | None = None
-
-    def __call__(self, iterable):
-        try:
-            if self.total_tasks is None:
-                # try to infer total_tasks from the length of the called iterator
-                try:
-                    self.total_tasks = len(iterable)
-                except (TypeError, AttributeError):
-                    pass
-            # call parent function
-            return super().__call__(iterable)
-        finally:
-            # close tqdm progress bar
-            if self.progress_bar is not None:
-                self.progress_bar.close()
-
-    __call__.__doc__ = Parallel.__call__.__doc__
-
-    def dispatch_one_batch(self, iterator):
-        # start progress_bar, if not started yet.
-        if self.progress_bar is None:
-            self.progress_bar = tqdm(
-                desc=self.desc,
-                total=self.total_tasks,
-                disable=self.disable_progressbar,
-                unit="tasks",
-            )
-        # call parent function
-        return super().dispatch_one_batch(iterator)
-
-    dispatch_one_batch.__doc__ = Parallel.dispatch_one_batch.__doc__
-
-    def print_progress(self):
-        """Display the process of the parallel execution using tqdm"""
-        # if we finish dispatching, find total_tasks from the number of remaining items
-        if self.total_tasks is None and self._original_iterator is None:
-            self.total_tasks = self.n_dispatched_tasks
-            self.progress_bar.total = self.total_tasks
-            self.progress_bar.refresh()
-        # update progressbar
-        self.progress_bar.update(self.n_completed_tasks - self.progress_bar.n)
-
-def lauch_once_MLSIC(m,N,K,V, rayleigh_scale):
+def lauch_once_greedySIC(m,N,K,V, rayleigh_scale, noise_scale):
     H = np.random.normal(scale=1/np.sqrt(m), size=(m, N))
     beta = np.random.rayleigh(scale=rayleigh_scale, size=K)
     # beta = 5 * np.ones(shape=(K))
@@ -106,7 +21,7 @@ def lauch_once_MLSIC(m,N,K,V, rayleigh_scale):
 
     # generating the received signal y
     # z = np.random.normal(scale=1, size=m)
-    z = 0
+    z = 0 if noise_scale == 0 else np.random.normal(scale=noise_scale, size=m)
     # chosenNums = np.random.choice(N, K, replace=False)
     # chosenNums = np.sort(chosenNums)
     chosenNums = np.arange(K)
@@ -132,32 +47,146 @@ def lauch_once_MLSIC(m,N,K,V, rayleigh_scale):
 
     toAdd = [decodedMsg in chosenNums for decodedMsg in decodedMsgsML]
 
-    # distances = np.array([ np.abs(decodedMsg - chosenNums[idx]) if decodedMsg in chosenNums else 10*K for idx, decodedMsg in enumerate(decodedMsgsML)], dtype=int)
 
+    toAdd2 = 1/K*sum([ pdf_Rayleigh(scale=rayleigh_scale, x=beta[cn]) * (np.abs(beta[cn] - beta[decodedMsgsML.index(cn)]) if cn in decodedMsgsML else beta[cn])  for cn in chosenNums])
+
+    distances = np.array([ np.abs(decodedMsg - chosenNums[idx]) if decodedMsg in chosenNums else 10*K for idx, decodedMsg in enumerate(decodedMsgsML)], dtype=int)
+    distances_toAdd = [ np.count_nonzero(distances == n) for n in range(K) ]
     # return [ np.count_nonzero(distances == n) for n in range(K) ]
-    return toAdd
+
+    return toAdd, toAdd2, distances_toAdd
+
+def lauch_once_greedySICsort(m,N,K,V, rayleigh_scale, noise_scale):
+    H = np.random.normal(scale=1/np.sqrt(m), size=(m, N))
+    beta = np.random.rayleigh(scale=rayleigh_scale, size=K)
+    # beta = 5 * np.ones(shape=(K))
+    # sort the vector from largest to smallest
+    beta = np.sort(beta)[::-1]
+    # print("These are the channels: ", beta, beta[0]**2, np.linalg.norm(beta[1:],2)**2 )
+
+    # generating the received signal y
+    z = 0 if noise_scale == 0 else np.random.normal(scale=noise_scale, size=m)
+    # chosenNums = np.random.choice(N, K, replace=False)
+    # chosenNums = np.sort(chosenNums)
+    chosenNums = np.arange(K)
+    # print("These are the index of chosen cdwds: ", chosenNums)
+    y_ml = np.sqrt(V) * H[:, chosenNums] @ beta + z
+    y_ml = np.expand_dims(y_ml, axis=-1)
+
+    ########### ML Decoding ##############
+    decodedMsgs = []
+
+    for j in range(K):
+        ress = y_ml - beta[j]*np.sqrt(V)*H
+        temp = np.linalg.norm(ress, axis=0)**2
+        scores = np.abs( temp )
+
+        if len(decodedMsgs) > 0: 
+            scores[decodedMsgs] = np.Infinity
+
+        suspect = np.argsort(scores)[0]
+        decodedMsgs.append(suspect)
+        y_ml = y_ml - np.array(H[:,suspect] * beta[j] * np.sqrt(V) ).reshape(m,1)
+
+        obj_curr = np.linalg.norm(y_ml,2)
+        if j > 0: # We want to sort before further decode. 
+            arr = np.sort(np.arange(start=1, step=1, stop=min(len(decodedMsgs)-1, 20),dtype=int))[::-1]
+            # print(arr)
+            for increment in arr:
+                num_iter = 0
+                flag = False
+                while True: 
+                    num_iter += 1
+                    for a in range(len(decodedMsgs) - increment):
+                        # old_obj = obj_curr
+                        b = a + increment
+                        proposed_residual = y_ml + np.sqrt(V)* np.array(beta[a]*H[:,decodedMsgs[a]]+beta[b]*H[:,decodedMsgs[b]]-beta[a]*H[:,decodedMsgs[b]]-beta[b]*H[:,decodedMsgs[a]]).reshape(m,1)
+                        proposed_obj = np.linalg.norm( proposed_residual, 2)
+                        if proposed_obj < obj_curr: 
+                            flag == True
+                            temp = decodedMsgs[a]
+                            decodedMsgs[a] = decodedMsgs[b]
+                            decodedMsgs[b] = temp
+                            obj_curr = proposed_obj
+                            y_ml = proposed_residual
+                
+                    if flag == False :
+                        # print("Reordering phase %d finished, used %d many iterations" % (increment ,num_iter))
+                        break
+        j = j + 1
+
+    toAdd = [decodedMsg in chosenNums for decodedMsg in decodedMsgs]
+
+    toAdd2 = 1/K*sum([ pdf_Rayleigh(scale=rayleigh_scale, x=beta[cn]) * (np.abs(beta[cn] - beta[decodedMsgs.index(cn)]) if cn in decodedMsgs else beta[cn])  for cn in chosenNums])
+
+    distances = np.array([ np.abs(decodedMsg - chosenNums[idx]) if decodedMsg in chosenNums else 10*K for idx, decodedMsg in enumerate(decodedMsgs)], dtype=int)
+    distances_toAdd = [ np.count_nonzero(distances == n) for n in range(K) ]
+
+    return toAdd, toAdd2, distances_toAdd
 
 
-# Define your matrix dimensions
-m, N = 700, 200000
-K = 100
+
+## Accept user inputs, specifying simulation arguments
+parser = OptionParser()
+parser.add_option("--args", type="string", dest="args", help="Arguments", default="")
+parser.add_option("--K", type="int", dest="K", help="Number of users", default=-1)
+parser.add_option("--m", type="int", dest="m", help="Number of channel use", default=-1)
+parser.add_option("--N", type="int", dest="N", help="width of sensing matrix", default=-1)
+parser.add_option("--RS", type="int", dest="RayleighScale", help="RayleighScale", default=-1)
+parser.add_option("--noisePower", type="float", dest="noisePower", help="noisePower", default=-1)
+parser.add_option("--num_trials", type="int", dest="num_trials", help="num of trials", default=-1)
+
+(options, args) = parser.parse_args()
+
+print( " --- --- --- --- --- ")
+
+### Examine whether the user inputs are valid
+K = options.K;                                  assert K > 0 
+m = options.m;                                  assert m > 100
+N = options.N;                                  assert N > m 
+RayleighScale = options.RayleighScale;          assert RayleighScale > 0
+noisePower = options.noisePower;                assert noisePower >= 0
+num_trials = options.num_trials;                assert num_trials > 0
+
+print("K, RayleighScale, noisePower, num_trials: ", K, RayleighScale, noisePower, num_trials)
+
 V = 1
-rayleigh_scale = 5
 
-num_trial = 200
+active_freq_total1 = np.zeros(K, dtype=int)
+active_freq_total2 = np.zeros(K, dtype=int)
+match_loss_total1 = 0
+match_loss_total2 = 0
+distance_total1 = np.zeros(K, dtype=int)
+distance_total2 = np.zeros(K, dtype=int)
 
-correct_freq_1 = np.zeros(K, dtype=int)
-args = [[m, N, K, V, rayleigh_scale]  for j in range(num_trial)]
+for j in tqdm(range(num_trials)):
+    active_freq_1_toadd, match_freq_toadd1, distance_toadd1 = lauch_once_greedySIC(m,N,K,V,RayleighScale, noise_scale=noisePower)
+    
+    active_freq_total1 += np.array(active_freq_1_toadd)
+    match_loss_total1  += match_freq_toadd1
+    distance_total1 += distance_toadd1
 
-for j in tqdm(range(num_trial)):
-    temp = lauch_once_MLSIC(m,N,K,V,rayleigh_scale)
-    correct_freq_1 = correct_freq_1 + np.array(temp)
+    freq_2_toadd, match_freq_toadd2, distance_toadd2 = lauch_once_greedySICsort(m,N,K,V, RayleighScale, noise_scale=noisePower)
+    active_freq_total2 += np.array(freq_2_toadd)
+    match_loss_total2  += match_freq_toadd2
+    distance_total2 += distance_toadd2
 
+print(" --- Vanilla ---")
+print("Accuracy: ", (np.sum(active_freq_total1)/ num_trials) / K)
+print("Num trials, match loss: ", num_trials, match_loss_total1)
+print("Active shift distance: ", distance_total1)
+print(" --- ")
 
-# array_needed = np.array(all_results).reshape((num_trial, K))
-# correct_freq_1 = np.sum(array_needed, axis=0)
+print(" --- IRM ---")
+print("Accuracy: ", (np.sum(active_freq_total2)/ num_trials) / K)
+print("Num trials, match loss: ", num_trials, match_loss_total2)
+print("Active shift distance: ", distance_total2)
+print(" --- ")
 
-plt.plot(range(K), 1/num_trial * correct_freq_1)
-plt.show()
+# plt.plot(range(K), 1/num_trial * match_freq_total1)
+# plt.plot(range(K), 1/num_trial * match_freq_total2)
+# plt.plot(range(K), 1/num_trial * match_freq_total3)
+# plt.plot(range(K), 1/num_trial * match_freq_total4)
 
-print(num_trial, correct_freq_1)
+# plt.legend(["vanilla noise0.1", "IRM noise.1", "vanilla noise.3", "IRM noise.3"])
+# plt.show()
