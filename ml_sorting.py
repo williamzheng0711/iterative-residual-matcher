@@ -2,14 +2,19 @@ import numpy as np
 from tqdm import tqdm
 import copy
 
-# Define your matrix dimensions
-m, N = 700, 200000
-K = 100
+def pdf_Rayleigh(scale, x):
+    return x*np.exp(-x**2 /(2*scale**2) ) / scale**2
 
-np.random.seed(8)
+# Define your matrix dimensions
+m, N = 800, 200000
+K = 125
+rayleigh_scale = 8
+noise_power = 0.3
+
+np.random.seed(10)
 H = np.random.normal(scale=1/np.sqrt(m), size=(m, N))
 V = 1
-beta = np.random.rayleigh(scale=5, size=K)
+beta = np.random.rayleigh(scale=rayleigh_scale, size=K)
 # beta = [ 5 + (j % 30)*5 for j in range(K) ]
 # beta = 5 * np.ones(shape=(K))
 # sort the vector from largest to smallest
@@ -17,7 +22,7 @@ beta = np.sort(beta)[::-1]
 print("These are the channels: ", beta, beta[0]**2, np.linalg.norm(beta[1:],2)**2)
 
 # generating the received signal y
-z = np.random.normal(scale=0.3, size=m)
+z = np.random.normal(scale=noise_power, size=m)
 # z = 0
 # chosenNums = np.random.choice(N, K, replace=False)
 # chosenNums = np.sort(chosenNums)
@@ -50,6 +55,7 @@ print(decodedMsgsML)
 lostsML = np.setdiff1d( decodedMsgsML, chosenNums)
 wrongML = len(lostsML)
 print("Vanilla ML-SIC Accuracy: %f " %  (1-wrongML/K) )
+print("Vanilla UEIM: ", 1/K*sum([ pdf_Rayleigh(scale=rayleigh_scale, x=beta[cn]) * (np.abs(beta[cn] - beta[decodedMsgsML.index(cn)]) if cn in decodedMsgsML else beta[cn])  for cn in chosenNums]))
 
 
 y_ml = copy.deepcopy(y_ml_or)
@@ -106,8 +112,10 @@ print(" ")
 print("ML-SIC with Sorting Accuracy: %f " %  (1-wrongML/K) )
 
 
+
 invariant_slot = 1
-while invariant_slot:
+nRounds = 0
+while invariant_slot or nRounds < 3:
     invariant_slot = 0
 
     # This part (roughly) ensures the invariance wrt each slot
@@ -154,8 +162,16 @@ while invariant_slot:
                 # print("Reordering phase %d finished, used %d many iterations" % (increment ,num_iter))
                 break
     print("Done with 2Perm")
+    nRounds += 1
 
 print(decodedMsgs)
 lostsML = np.setdiff1d(decodedMsgs, chosenNums)
 wrongML = len(lostsML)
 print("ML-SIC with Sorting & AO Accuracy: %f " %  (1-wrongML/K) )
+print("IRM UEIM: ", 1/K*sum([ pdf_Rayleigh(scale=rayleigh_scale, x=beta[cn]) * (np.abs(beta[cn] - beta[decodedMsgs.index(cn)]) if cn in decodedMsgs else beta[cn])  for cn in chosenNums]))
+
+
+distances = np.array([ np.abs(decodedMsg - chosenNums[idx]) if decodedMsg in chosenNums else 10*K for idx, decodedMsg in enumerate(decodedMsgs)], dtype=int)
+distances_toAdd = [ np.count_nonzero(distances == n) for n in range(K) ]
+print("Distance", distances_toAdd)
+

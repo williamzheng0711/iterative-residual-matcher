@@ -11,24 +11,9 @@ from optparse import OptionParser
 def pdf_Rayleigh(scale, x):
     return x*np.exp(-x**2 /(2*scale**2) ) / scale**2
 
-def lauch_once_greedySIC(m,N,K,V, rayleigh_scale, noise_scale):
-    H = np.random.normal(scale=1/np.sqrt(m), size=(m, N))
-    beta = np.random.rayleigh(scale=rayleigh_scale, size=K)
-    # beta = 5 * np.ones(shape=(K))
-    # sort the vector from largest to smallest
-    beta = np.sort(beta)[::-1]
-    # print("These are the channels: ", beta, beta[0]**2, np.linalg.norm(beta[1:],2)**2 )
 
-    # generating the received signal y
-    # z = np.random.normal(scale=1, size=m)
-    z = 0 if noise_scale == 0 else np.random.normal(scale=noise_scale, size=m)
-    # chosenNums = np.random.choice(N, K, replace=False)
-    # chosenNums = np.sort(chosenNums)
-    chosenNums = np.arange(K)
-    # print("These are the index of chosen cdwds: ", chosenNums)
-    y_ml = np.sqrt(V) * H[:, chosenNums] @ beta + z
-    y_ml = np.expand_dims(y_ml, axis=-1)
 
+def lauch_once_greedySIC(y_ml, m, K,V, rayleigh_scale):
     ########### ML Decoding ##############
     decodedMsgsML = []
 
@@ -56,23 +41,8 @@ def lauch_once_greedySIC(m,N,K,V, rayleigh_scale, noise_scale):
 
     return toAdd, toAdd2, distances_toAdd
 
-def lauch_once_greedySICsort(m,N,K,V, rayleigh_scale, noise_scale):
-    H = np.random.normal(scale=1/np.sqrt(m), size=(m, N))
-    beta = np.random.rayleigh(scale=rayleigh_scale, size=K)
-    # beta = 5 * np.ones(shape=(K))
-    # sort the vector from largest to smallest
-    beta = np.sort(beta)[::-1]
-    # print("These are the channels: ", beta, beta[0]**2, np.linalg.norm(beta[1:],2)**2 )
 
-    # generating the received signal y
-    z = 0 if noise_scale == 0 else np.random.normal(scale=noise_scale, size=m)
-    # chosenNums = np.random.choice(N, K, replace=False)
-    # chosenNums = np.sort(chosenNums)
-    chosenNums = np.arange(K)
-    # print("These are the index of chosen cdwds: ", chosenNums)
-    y_ml = np.sqrt(V) * H[:, chosenNums] @ beta + z
-    y_ml = np.expand_dims(y_ml, axis=-1)
-
+def lauch_once_greedySICsort(y_ml, m, K,V, rayleigh_scale):
     ########### ML Decoding ##############
     decodedMsgs = []
 
@@ -152,6 +122,8 @@ print("K, RayleighScale, noisePower, num_trials: ", K, RayleighScale, noisePower
 
 V = 1
 
+np.random.seed(8)
+
 active_freq_total1 = np.zeros(K, dtype=int)
 active_freq_total2 = np.zeros(K, dtype=int)
 match_loss_total1 = 0
@@ -160,13 +132,32 @@ distance_total1 = np.zeros(K, dtype=int)
 distance_total2 = np.zeros(K, dtype=int)
 
 for j in tqdm(range(num_trials)):
-    active_freq_1_toadd, match_freq_toadd1, distance_toadd1 = lauch_once_greedySIC(m,N,K,V,RayleighScale, noise_scale=noisePower)
+    H = np.random.normal(scale=1/np.sqrt(m), size=(m, N))
+    beta = np.random.rayleigh(scale=RayleighScale, size=K)
+    # beta = 5 * np.ones(shape=(K))
+    # sort the vector from largest to smallest
+    beta = np.sort(beta)[::-1]
+    # print("These are the channels: ", beta, beta[0]**2, np.linalg.norm(beta[1:],2)**2 )
+
+    # generating the received signal y
+    # z = np.random.normal(scale=1, size=m)
+    z = 0 if noisePower == 0 else np.random.normal(scale=noisePower, size=m)
+    # chosenNums = np.random.choice(N, K, replace=False)
+    # chosenNums = np.sort(chosenNums)
+    chosenNums = np.arange(K)
+    # print("These are the index of chosen cdwds: ", chosenNums)
+    y_ml = np.sqrt(V) * H[:, chosenNums] @ beta + z
+    y_ml = np.expand_dims(y_ml, axis=-1)
+
+    y_ml_1 = copy.deepcopy(y_ml)
+    active_freq_1_toadd, match_freq_toadd1, distance_toadd1 = lauch_once_greedySIC(y_ml_1, m, K, V, RayleighScale)
     
     active_freq_total1 += np.array(active_freq_1_toadd)
     match_loss_total1  += match_freq_toadd1
     distance_total1 += distance_toadd1
 
-    freq_2_toadd, match_freq_toadd2, distance_toadd2 = lauch_once_greedySICsort(m,N,K,V, RayleighScale, noise_scale=noisePower)
+    y_ml_2 = copy.deepcopy(y_ml)
+    freq_2_toadd, match_freq_toadd2, distance_toadd2 = lauch_once_greedySICsort(y_ml_2, m, K, V, RayleighScale)
     active_freq_total2 += np.array(freq_2_toadd)
     match_loss_total2  += match_freq_toadd2
     distance_total2 += distance_toadd2
