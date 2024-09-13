@@ -9,9 +9,9 @@ def pdf_Rayleigh(scale, x):
 m, N = 800, 200000
 K = 125
 rayleigh_scale = 8
-noise_power = 0.3
+noise_power = 0.1
 
-np.random.seed(10)
+np.random.seed(14)
 H = np.random.normal(scale=1/np.sqrt(m), size=(m, N))
 V = 1
 beta = np.random.rayleigh(scale=rayleigh_scale, size=K)
