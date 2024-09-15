@@ -21,6 +21,8 @@ def tqdm_joblib(tqdm_object):
         tqdm_object.close()
 
 
-with tqdm_joblib(tqdm(desc="My calculation", total=30)) as progress_bar:
-    a = Parallel(n_jobs=16)(delayed(sqrt)(i**2) for i in range(10))
+with tqdm_joblib(tqdm(desc="My calculation", total=10)) as progress_bar:
+    a = Parallel(n_jobs=-1)(delayed(sqrt)(i) for i in range(10))
 print(a)
+
+

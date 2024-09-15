@@ -1,176 +1,51 @@
 import numpy as np
 from tqdm import tqdm
 import copy
-import utils
+from utils import * 
 
+### Some reminders 
+# We use "M" denotes the "2^B" in the paper, since we can choose M as any integer. 
 
-# Define your matrix dimensions
-m, N = 800, 200000
+np.random.seed(14)
+
+N, M = 800, 2000
 K = 125
 rayleigh_scale = 8
 noise_power = 0.1
+H = np.random.normal(scale=1/np.sqrt(N), size=(N, M))  
 
-np.random.seed(14)
-H = np.random.normal(scale=1/np.sqrt(m), size=(m, N))
-V = 1
+V = 1 
+
+# Generating the channel coefficients, and order them from the largest to the smallest. 
 beta = np.random.rayleigh(scale=rayleigh_scale, size=K)
-# beta = [ 5 + (j % 30)*5 for j in range(K) ]
-# beta = 5 * np.ones(shape=(K))
-# sort the vector from largest to smallest
 beta = np.sort(beta)[::-1]
-print("These are the channels: ", beta, beta[0]**2, np.linalg.norm(beta[1:],2)**2)
+print("The are the channel coefficients: ", beta)
 
-# generating the received signal y
-z = np.random.normal(scale=noise_power, size=m)
-# z = 0
-# chosenNums = np.random.choice(N, K, replace=False)
-# chosenNums = np.sort(chosenNums)
-chosenNums = np.arange(K)
+# Generating the received signal y
+z = np.random.normal(scale=noise_power, size=N)
+chosenNums = np.arange(K)   ## For simplicity and WLOG, one can always TX the first K messages. With message k pairing with h_k
 print("These are the index of chosen cdwds: ", chosenNums)
-y_ml_or = np.sqrt(V) * H[:, chosenNums] @ beta + z
-y_ml_or = np.expand_dims(y_ml_or, axis=-1)
-y_ml = copy.deepcopy(y_ml_or)
-
-
-########### ML-SIC ##############
-decodedMsgsML = []
-num_decoded_ml = 0
-
-for j in tqdm(range(K)):
-    # print(y.shape)
-    ress = y_ml - beta[j]*np.sqrt(V)*H
-    temp = np.linalg.norm(ress, axis=0)**2
-    scores = np.abs( temp )
-
-    if len(decodedMsgsML) > 0: 
-        scores[decodedMsgsML] = np.Infinity
-    suspect = np.argsort(scores)[0]
-    decodedMsgsML.append(suspect)
-    y_ml = y_ml - np.array(H[:,suspect] * beta[j] * np.sqrt(V)).reshape(m,1)
-    j = j + 1
-
-# print(P.value)
-print(decodedMsgsML)
-lostsML = np.setdiff1d( decodedMsgsML, chosenNums)
-wrongML = len(lostsML)
-print("Vanilla ML-SIC Accuracy: %f " %  (1-wrongML/K) )
-print("Vanilla UEIM: ", 1/K*sum([ pdf_Rayleigh(scale=rayleigh_scale, x=beta[cn]) * (np.abs(beta[cn] - beta[decodedMsgsML.index(cn)]) if cn in decodedMsgsML else beta[cn])  for cn in chosenNums]))
-
-
-y_ml = copy.deepcopy(y_ml_or)
-
-########### ML-SIC with sorting ##############
-decodedMsgs = []
-num_decoded_ml = 0
-
-for j in range(K):
-
-    ress = y_ml - beta[j]*np.sqrt(V)*H
-    temp = np.linalg.norm(ress, axis=0)**2
-    scores = np.abs( temp )
-
-    if len(decodedMsgs) > 0: 
-        scores[decodedMsgs] = np.Infinity
-
-    suspect = np.argsort(scores)[0]
-    decodedMsgs.append(suspect)
-    y_ml = y_ml - np.array(H[:,suspect] * beta[j] * np.sqrt(V) ).reshape(m,1)
-
-    obj_curr = np.linalg.norm(y_ml,2)
-    if j > 0: # We want to sort before further decode. 
-        arr = np.sort(np.arange(start=1, step=1, stop=min(len(decodedMsgs)-1, 30),dtype=int))[::-1]
-        # print(arr)
-        for increment in arr:
-            num_iter = 0
-            flag = False
-            while True: 
-                num_iter += 1
-                for a in range(len(decodedMsgs) - increment):
-                    # old_obj = obj_curr
-                    b = a + increment
-                    proposed_residual = y_ml + np.sqrt(V)* np.array(beta[a]*H[:,decodedMsgs[a]]+beta[b]*H[:,decodedMsgs[b]]-beta[a]*H[:,decodedMsgs[b]]-beta[b]*H[:,decodedMsgs[a]]).reshape(m,1)
-                    proposed_obj = np.linalg.norm( proposed_residual, 2)
-                    if proposed_obj < obj_curr: 
-                        flag == True
-                        temp = decodedMsgs[a]
-                        decodedMsgs[a] = decodedMsgs[b]
-                        decodedMsgs[b] = temp
-                        obj_curr = proposed_obj
-                        y_ml = proposed_residual
-            
-                if flag == False :
-                    # print("Reordering phase %d finished, used %d many iterations" % (increment ,num_iter))
-                    break
-    print(decodedMsgs, end="\r", )
-    j = j + 1
-
-# print(decodedMsgs)
-lostsML = np.setdiff1d(decodedMsgs, chosenNums)
-wrongML = len(lostsML)
-print(" ")
-print("ML-SIC with Sorting Accuracy: %f " %  (1-wrongML/K) )
+y_or = np.sqrt(V) * H[:, chosenNums] @ beta + z
+y_or = np.expand_dims(y_or, axis=-1)
 
 
 
-invariant_slot = 1
-nRounds = 0
-while invariant_slot or nRounds < 3:
-    invariant_slot = 0
-
-    # This part (roughly) ensures the invariance wrt each slot
-    for k in tqdm(np.arange(start=K-1, step=-1, stop=-1)):
-        msg_k = decodedMsgs[k]
-        y_iter = y_ml + beta[k]*np.sqrt(V)*np.array(H[:,msg_k]).reshape(-1,1)
-        ress = y_iter - beta[k]*np.sqrt(V)*H
-        temp = np.linalg.norm(ress, axis=0)**2
-        scores = np.abs( temp )
-        excludeIndex = [a for a in decodedMsgs if a != msg_k]
-        scores[excludeIndex] = np.Infinity
-        suspect = np.argsort(scores)[0]
-        if suspect != msg_k: 
-            invariant_slot = 1
-            print(k, msg_k, suspect)
-        decodedMsgs[k] = suspect
-        y_ml = y_ml + beta[k]*np.sqrt(V)*np.array(H[:, msg_k]).reshape(-1,1) - beta[k]*np.sqrt(V)*np.array(H[:, suspect]).reshape(-1,1)
-    print("Done with CD")
-    
-    # This part (roughly) ensures the invariance wrt pairwisely permutation
-    obj_curr = np.linalg.norm(y_ml,2)
-    arr = np.sort(np.arange(start=1, step=1, stop=min(len(decodedMsgs)-1, 30),dtype=int))[::-1]
-    # print(arr)
-    for increment in tqdm(arr):
-        num_iter = 0
-        flag = False
-        while True: 
-            num_iter += 1
-            for a in range(len(decodedMsgs) - increment):
-                # old_obj = obj_curr
-                b = a + increment
-                proposed_residual = y_ml + np.sqrt(V)* np.array(beta[a]*H[:,decodedMsgs[a]]+beta[b]*H[:,decodedMsgs[b]]-beta[a]*H[:,decodedMsgs[b]]-beta[b]*H[:,decodedMsgs[a]]).reshape(m,1)
-                proposed_obj = np.linalg.norm( proposed_residual, 2)
-                if proposed_obj < obj_curr: 
-                    flag == True
-                    temp = decodedMsgs[a]
-                    decodedMsgs[a] = decodedMsgs[b]
-                    decodedMsgs[b] = temp
-                    # print("Switched", (decodedMsgs[a], a), (decodedMsgs[b], b))
-                    obj_curr = proposed_obj
-                    y_ml = proposed_residual
-        
-            if flag == False :
-                # print("Reordering phase %d finished, used %d many iterations" % (increment ,num_iter))
-                break
-    print("Done with 2Perm")
-    nRounds += 1
-
-print(decodedMsgs)
-lostsML = np.setdiff1d(decodedMsgs, chosenNums)
-wrongML = len(lostsML)
-print("ML-SIC with Sorting & AO Accuracy: %f " %  (1-wrongML/K) )
-print("IRM UEIM: ", 1/K*sum([ pdf_Rayleigh(scale=rayleigh_scale, x=beta[cn]) * (np.abs(beta[cn] - beta[decodedMsgs.index(cn)]) if cn in decodedMsgs else beta[cn])  for cn in chosenNums]))
+########### vanilla SIC ##############
+y_vsic = copy.deepcopy(y_or)
+decodedMsgs_vsic = vSIC(y_vsic=y_vsic, K=K, beta=beta, H=H, N=N, V=V, prtDetail=False)
+print(decodedMsgs_vsic)
+accuracy_vsic, EUIM_vsic = evaluate_result(K=K, chosenNums=chosenNums, decodedMsgs=decodedMsgs_vsic, rayleigh_scale=rayleigh_scale, beta=beta)
+print(" vanilla SIC Accuracy: %f " %  accuracy_vsic)
+print(" vanilla SIC EUIM: " + str(EUIM_vsic) )
 
 
-distances = np.array([ np.abs(decodedMsg - chosenNums[idx]) if decodedMsg in chosenNums else 10*K for idx, decodedMsg in enumerate(decodedMsgs)], dtype=int)
-distances_toAdd = [ np.count_nonzero(distances == n) for n in range(K) ]
-print("Distance", distances_toAdd)
 
+########### Iterative Residual Matcher ##############
+y_irm = copy.deepcopy(y_or)
+decodedMsgs_irm = IRM(y_irm=y_irm, K=K, beta=beta, H=H, N=N, V=V, prtDetail=False)
+accuracy_irm, EUIM_irm = evaluate_result(K=K, chosenNums=chosenNums, decodedMsgs=decodedMsgs_irm, rayleigh_scale=rayleigh_scale, beta=beta)
+print(" IRM Accuracy: %f " %  accuracy_irm)
+print(" IRM EUIM: " + str(EUIM_irm))
+
+distances, distances_toAdd= get_distanceInfo(K, chosenNums, decodedMsgs_irm)
+print(" Mismatch frequency: ", distances_toAdd)
