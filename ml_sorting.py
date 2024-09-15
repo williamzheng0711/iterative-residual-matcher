@@ -1,9 +1,8 @@
 import numpy as np
 from tqdm import tqdm
 import copy
+import utils
 
-def pdf_Rayleigh(scale, x):
-    return x*np.exp(-x**2 /(2*scale**2) ) / scale**2
 
 # Define your matrix dimensions
 m, N = 800, 200000

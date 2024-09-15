@@ -3,14 +3,8 @@ from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 import copy
 import matplotlib.pyplot as plt
+import utils
 from optparse import OptionParser
-# from joblib import Parallel, delayed
-# from parallel import ParallelTqdm
-
-
-def pdf_Rayleigh(scale, x):
-    return x*np.exp(-x**2 /(2*scale**2) ) / scale**2
-
 
 
 def lauch_once_greedySIC(y_ml, m, K,V, rayleigh_scale):
@@ -33,7 +27,7 @@ def lauch_once_greedySIC(y_ml, m, K,V, rayleigh_scale):
     toAdd = [decodedMsg in chosenNums for decodedMsg in decodedMsgsML]
 
 
-    toAdd2 = 1/K*sum([ pdf_Rayleigh(scale=rayleigh_scale, x=beta[cn]) * (np.abs(beta[cn] - beta[decodedMsgsML.index(cn)]) if cn in decodedMsgsML else beta[cn])  for cn in chosenNums])
+    toAdd2 = 1/K*sum([ utils.pdf_Rayleigh(scale=rayleigh_scale, x=beta[cn]) * (np.abs(beta[cn] - beta[decodedMsgsML.index(cn)]) if cn in decodedMsgsML else beta[cn])  for cn in chosenNums])
 
     distances = np.array([ np.abs(decodedMsg - chosenNums[idx]) if decodedMsg in chosenNums else 10*K for idx, decodedMsg in enumerate(decodedMsgsML)], dtype=int)
     distances_toAdd = [ np.count_nonzero(distances == n) for n in range(K) ]
@@ -87,7 +81,7 @@ def lauch_once_greedySICsort(y_ml, m, K,V, rayleigh_scale):
 
     toAdd = [decodedMsg in chosenNums for decodedMsg in decodedMsgs]
 
-    toAdd2 = 1/K*sum([ pdf_Rayleigh(scale=rayleigh_scale, x=beta[cn]) * (np.abs(beta[cn] - beta[decodedMsgs.index(cn)]) if cn in decodedMsgs else beta[cn])  for cn in chosenNums])
+    toAdd2 = 1/K*sum([ utils.pdf_Rayleigh(scale=rayleigh_scale, x=beta[cn]) * (np.abs(beta[cn] - beta[decodedMsgs.index(cn)]) if cn in decodedMsgs else beta[cn])  for cn in chosenNums])
 
     distances = np.array([ np.abs(decodedMsg - chosenNums[idx]) if decodedMsg in chosenNums else 10*K for idx, decodedMsg in enumerate(decodedMsgs)], dtype=int)
     distances_toAdd = [ np.count_nonzero(distances == n) for n in range(K) ]

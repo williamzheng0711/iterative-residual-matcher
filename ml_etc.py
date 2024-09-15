@@ -3,7 +3,7 @@ from tqdm import tqdm
 import copy
 
 # Define your matrix dimensions
-m, N = 700, 100000
+m, N = 800, 100000
 K = 100
 
 H = np.random.normal(scale=1/np.sqrt(m), size=(m, N))
