@@ -8,7 +8,7 @@ from utils import *
 
 np.random.seed(14)
 
-N, M = 800, 2000
+N, M = 800, 200000
 K = 125
 rayleigh_scale = 8
 noise_power = 0.1
@@ -32,7 +32,7 @@ y_or = np.expand_dims(y_or, axis=-1)
 
 ########### vanilla SIC ##############
 y_vsic = copy.deepcopy(y_or)
-decodedMsgs_vsic = vSIC(y_vsic=y_vsic, K=K, beta=beta, H=H, N=N, V=V, prtDetail=False)
+decodedMsgs_vsic = vSIC(y_vsic=y_vsic, K=K, beta=beta, H=H, N=N, V=V, prtDetail=True)
 print(decodedMsgs_vsic)
 accuracy_vsic, EUIM_vsic = evaluate_result(K=K, chosenNums=chosenNums, decodedMsgs=decodedMsgs_vsic, rayleigh_scale=rayleigh_scale, beta=beta)
 print(" vanilla SIC Accuracy: %f " %  accuracy_vsic)
@@ -42,7 +42,7 @@ print(" vanilla SIC EUIM: " + str(EUIM_vsic) )
 
 ########### Iterative Residual Matcher ##############
 y_irm = copy.deepcopy(y_or)
-decodedMsgs_irm = IRM(y_irm=y_irm, K=K, beta=beta, H=H, N=N, V=V, prtDetail=False)
+decodedMsgs_irm = IRM(y_irm=y_irm, K=K, beta=beta, H=H, N=N, V=V, prtDetail=True)
 accuracy_irm, EUIM_irm = evaluate_result(K=K, chosenNums=chosenNums, decodedMsgs=decodedMsgs_irm, rayleigh_scale=rayleigh_scale, beta=beta)
 print(" IRM Accuracy: %f " %  accuracy_irm)
 print(" IRM EUIM: " + str(EUIM_irm))

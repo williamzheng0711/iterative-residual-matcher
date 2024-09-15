@@ -88,7 +88,7 @@ sum_dist_vsic = np.zeros(K, dtype=int)
 sum_dist_irm  = np.zeros(K, dtype=int)
 
 with tqdm_joblib(tqdm(desc="Progress", total=num_trials)) as progress_bar:
-    a = Parallel(n_jobs=-1)( delayed(single_vsic_and_irm)(N, M, K, V, RayleighScale, noisePower) for _ in range(num_trials))
+    a = Parallel(n_jobs=5)( delayed(single_vsic_and_irm)(N, M, K, V, RayleighScale, noisePower) for _ in range(num_trials))
 
 for j in range(num_trials):
     thisResult = a[j] 
