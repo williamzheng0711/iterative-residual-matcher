@@ -28,7 +28,9 @@ def tqdm_joblib(tqdm_object):
         tqdm_object.close()
 
 
-def single_vsic_and_irm(N, M, K, V, rayleigh_scale, noisePower):
+def single_vsic_and_irm(N, M, K, V, rayleigh_scale, noisePower, randomSeed):
+    np.random.seed(randomSeed)
+
     H = np.random.normal(scale=1/np.sqrt(N), size=(N, M))
     beta = np.random.rayleigh(scale=rayleigh_scale, size=K)
     beta = np.sort(beta)[::-1]
@@ -78,7 +80,7 @@ print("K, RayleighScale, noisePower, num_trials: ", K, RayleighScale, noisePower
 
 V = 1
 
-np.random.seed(8)
+# np.random.seed(8)
 
 sum_acc_vsic = 0 
 sum_acc_irm  = 0
@@ -88,7 +90,7 @@ sum_dist_vsic = np.zeros(K, dtype=int)
 sum_dist_irm  = np.zeros(K, dtype=int)
 
 with tqdm_joblib(tqdm(desc="Progress", total=num_trials)) as progress_bar:
-    a = Parallel(n_jobs=5)( delayed(single_vsic_and_irm)(N, M, K, V, RayleighScale, noisePower) for _ in range(num_trials))
+    a = Parallel(n_jobs=5)( delayed(single_vsic_and_irm)(N, M, K, V, RayleighScale, noisePower, j) for j in range(num_trials))
 
 for j in range(num_trials):
     thisResult = a[j] 
